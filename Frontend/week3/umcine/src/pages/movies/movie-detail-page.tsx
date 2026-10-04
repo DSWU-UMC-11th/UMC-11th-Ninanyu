@@ -5,6 +5,27 @@ import { cn } from "../../utils/cn";
 
 const STARS = [1, 2, 3, 4, 5];
 
+function MaskIcon({ src, className }: { src: string; className?: string }) {
+  const url = `url(${src})`;
+
+  return (
+    <span
+      className={cn("block shrink-0 bg-current", className)}
+      style={{
+        WebkitMaskImage: url,
+        maskImage: url,
+        WebkitMaskSize: "contain",
+        maskSize: "contain",
+        WebkitMaskRepeat: "no-repeat",
+        maskRepeat: "no-repeat",
+        WebkitMaskPosition: "center",
+        maskPosition: "center",
+      }}
+      aria-hidden="true"
+    />
+  );
+}
+
 export function MovieDetailPage() {
   const { movieId } = useParams({ from: "/movies/$movieId" });
   const movie = movies.find((item) => item.id === Number(movieId));
@@ -15,53 +36,39 @@ export function MovieDetailPage() {
 
   if (!movie) {
     return (
-      <main className="mx-auto max-w-[1440px] px-20 py-24 text-center text-sm text-[#6b7078]">
+      <main className="mx-auto max-w-[1440px] px-20 py-24 text-center text-sm text-[#606774]">
         영화를 찾을 수 없어요.
       </main>
     );
   }
 
-  const bookmarkIconUrl = isBookmarked
-    ? "/icons/bookmark.svg"
-    : "/icons/bookmark-outline.svg";
-
   return (
     <main>
       {/* 상단 backdrop */}
-      <section className="relative h-[360px] overflow-hidden bg-[#16181d]">
+      <section className="relative h-[360px] overflow-hidden bg-[#17191e]">
         <img
           className="absolute inset-0 size-full object-cover"
           src={movie.backdropPath}
           alt=""
           aria-hidden="true"
         />
-        <div
-          className="absolute inset-0 bg-linear-to-t from-black/75 via-black/10 to-transparent"
-          aria-hidden="true"
-        />
 
-        <div className="relative mx-auto flex h-full max-w-[1440px] flex-col justify-between px-20 pb-6 pt-8">
+        <div className="relative mx-auto flex h-full max-w-[1440px] flex-col justify-between px-20 py-6">
           <Link
             to="/"
-            className="inline-flex items-center gap-1 self-start text-[13px] font-medium text-white"
+            style={{ color: "#ffffff" }}
+            className="inline-flex items-center gap-1 self-start text-[13px] font-bold"
           >
-            <span
-              className="block size-4 bg-white mask-contain mask-center mask-no-repeat"
-              style={{
-                WebkitMaskImage: "url(/icons/chevron-left.svg)",
-                maskImage: "url(/icons/chevron-left.svg)",
-              }}
-              aria-hidden="true"
-            />
+            <MaskIcon src="/icons/chevron-left.svg" className="size-6" />
             영화 목록
           </Link>
 
-          <div className="text-white">
-            <h1 className="text-[44px] font-bold leading-tight tracking-[-0.04em]">
+          <div className="flex max-w-[800px] flex-col gap-2 text-white">
+            <h1 className="text-[46px] font-bold leading-[50px] tracking-[-2.3px]">
               {movie.title}
             </h1>
-            <p className="mt-2 text-sm text-white/90">{movie.originalTitle}</p>
-            <p className="mt-1.5 flex gap-3 text-[13px] font-bold">
+            <p className="text-sm leading-[17px]">{movie.originalTitle}</p>
+            <p className="flex gap-2 text-[13px] font-bold leading-4">
               <span>{movie.releaseDate}</span>
               <span>{movie.genres.join(" · ")}</span>
               <span>{movie.runtime}</span>
@@ -71,49 +78,44 @@ export function MovieDetailPage() {
       </section>
 
       {/* 본문 */}
-      <div className="mx-auto flex max-w-[1440px] gap-8 px-20 py-6">
+      <div className="mx-auto flex max-w-[1440px] items-start gap-8 px-20 py-6">
         <img
-          className="h-[286px] w-[200px] shrink-0 rounded-lg bg-[#e4e6ea] object-cover shadow-[0_8px_24px_rgba(0,0,0,0.12)]"
+          className="h-[286px] w-[200px] shrink-0 rounded-[10px] bg-[#f6f7f9] object-cover shadow-[0_12px_30px_rgba(12,15,20,0.12)]"
           src={movie.posterPath}
           alt={`${movie.title} 포스터`}
         />
 
-        <section className="min-w-0 flex-1 pr-8">
-          <h2 className="text-xl font-bold tracking-[-0.03em] text-[#16181d]">
+        <section className="flex min-w-0 flex-1 flex-col items-start gap-3">
+          <h2 className="text-[21px] font-bold leading-[25px] tracking-[-0.63px] text-[#17191e]">
             {movie.tagline}
           </h2>
-          <p className="mt-3 whitespace-pre-line text-sm leading-[1.7] text-[#6b7078]">
+          <p className="whitespace-pre-line text-sm leading-6 text-[#606774]">
             {movie.overview}
           </p>
-
           <button
             type="button"
             aria-pressed={isBookmarked}
             onClick={() => setIsBookmarked((prev) => !prev)}
-            className="mt-5 inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg bg-[#2f5bea] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#2549c4]"
+            className="inline-flex h-[42px] cursor-pointer items-center justify-center gap-2 rounded-lg border border-white bg-[#2563eb] px-4 text-sm font-extrabold text-white transition-colors hover:bg-[#1d4fd0]"
           >
-            <span
-              className="block size-4 bg-white mask-contain mask-center mask-no-repeat"
-              style={{
-                WebkitMaskImage: `url(${bookmarkIconUrl})`,
-                maskImage: `url(${bookmarkIconUrl})`,
-              }}
-              aria-hidden="true"
+            <MaskIcon
+              src={isBookmarked ? "/icons/bookmark.svg" : "/icons/bookmark-outline.svg"}
+              className="size-4"
             />
             즐겨찾기
           </button>
         </section>
 
         {/* 내 평점 */}
-        <aside className="w-[360px] shrink-0 self-start border-l border-[#e4e6ea] pl-8">
-          <h2 className="text-xl font-bold tracking-[-0.03em] text-[#16181d]">
+        <aside className="flex w-[360px] shrink-0 flex-col gap-2 border-l border-[#e3e6eb] pb-[41px] pl-[30px]">
+          <h2 className="text-[21px] font-bold leading-[25px] tracking-[-0.63px] text-[#17191e]">
             내 평점
           </h2>
-          <p className="mt-1.5 text-xs text-[#8a8f98]">
+          <p className="text-xs leading-[14px] text-[#969da8]">
             별점은 필수, 후기는 선택이에요.
           </p>
 
-          <div className="mt-3 flex gap-1" role="radiogroup" aria-label="별점">
+          <div className="flex gap-1" role="radiogroup" aria-label="영화 별점">
             {STARS.map((value) => (
               <button
                 key={value}
@@ -123,15 +125,11 @@ export function MovieDetailPage() {
                 aria-label={`${value}점`}
                 onClick={() => setRating(value)}
                 className={cn(
-                  "inline-flex size-[38px] cursor-pointer items-center justify-center rounded-[10px] border border-[#e4e6ea] bg-white transition-colors hover:bg-[#f5f6f8]",
-                  value <= rating ? "text-[#4b4f58]" : "text-[#c9cdd3]",
+                  "inline-flex size-[38px] cursor-pointer items-center justify-center rounded-lg border border-[#e3e6eb] bg-white transition-colors hover:bg-[#f6f7f9]",
+                  value <= rating ? "text-[#17191e]" : "text-[#606774]",
                 )}
               >
-                <svg
-                  viewBox="0 0 24 24"
-                  className="size-5 fill-current"
-                  aria-hidden="true"
-                >
+                <svg viewBox="0 0 24 24" className="size-6 fill-current" aria-hidden="true">
                   <path d="M12 2.5l2.94 5.96 6.58.96-4.76 4.64 1.12 6.55L12 17.52l-5.88 3.09 1.12-6.55L2.48 9.42l6.58-.96L12 2.5z" />
                 </svg>
               </button>
@@ -143,13 +141,13 @@ export function MovieDetailPage() {
             placeholder="영화를 보고 느낀 점을 남겨보세요."
             value={review}
             onChange={(event) => setReview(event.target.value)}
-            className="mt-2 h-[102px] w-full resize-none rounded-lg border border-[#e4e6ea] bg-white p-3 text-[13px] text-[#16181d] outline-none placeholder:text-[#8a8f98] focus:border-[#16181d]"
+            className="h-[102px] w-full resize-none rounded-lg border border-[#e3e6eb] bg-white px-3 pb-[18px] pt-4 text-[13px] leading-5 text-[#17191e] outline-none placeholder:text-[#969da8] focus:border-[#17191e]"
           />
 
           <button
             type="button"
             disabled={rating === 0}
-            className="mt-2.5 h-10 w-full cursor-pointer rounded-lg bg-[#16181d] text-sm font-bold text-white transition-opacity hover:bg-black disabled:cursor-not-allowed disabled:opacity-40"
+            className="h-[42px] w-full cursor-pointer rounded-lg border border-white bg-[#17191e] px-4 text-sm font-extrabold text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-40"
           >
             평점 저장
           </button>
