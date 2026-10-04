@@ -17,4 +17,8 @@ public class RentalService {
         rentalRepository.save(body);                   // 소문자로 호출
     }
 
+    public void returnBook(Long rentalId) {
+        rentalRepository.updateReturnedAt(rentalId);
+    }
+
 }
