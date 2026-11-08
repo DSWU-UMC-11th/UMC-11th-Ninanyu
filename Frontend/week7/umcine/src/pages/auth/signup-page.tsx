@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { checkEmailDuplicate } from "../../api/members/check-email-duplicate";
 import { checkNicknameDuplicate } from "../../api/members/check-nickname-duplicate";
+import { signup } from "../../api/members/signup";
+// import { useNavigate } from "@tanstack/react-router";
 
 // 이메일 형식 검사
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -26,8 +28,7 @@ const DEFAULT_DUPLICATE_CHECK = {
 type DuplicateCheckKey = "email" | "nickname";
 
 // 공통 스타일 (Figma 값 기준)
-const labelClass =
-  "text-[13px] font-extrabold leading-4 text-[#17191E]"; // 13px / 800 / 16px
+const labelClass = "text-[13px] font-extrabold leading-4 text-[#17191E]"; // 13px / 800 / 16px
 const fieldBase =
   "box-border flex min-h-12 w-full items-center rounded-lg border bg-white px-[13px] py-[14px] focus-within:border-[#2563EB]"; // 패딩 14px 13px, radius 8px
 const inputClass =
@@ -45,6 +46,8 @@ export function SignupPage() {
     email: DEFAULT_DUPLICATE_CHECK,
     nickname: DEFAULT_DUPLICATE_CHECK,
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  // const navigate = useNavigate();
 
   // 입력값의 유효성 검사
   const isEmailValid = EMAIL_REGEX.test(form.email.trim());
@@ -78,7 +81,10 @@ export function SignupPage() {
     if (key === "email" || key === "nickname") {
       if (duplicateCheck[key].isChecking) return;
       // 확인한 값을 바꾸면 다시 중복 확인해야 함
-      setDuplicateCheck((prev) => ({ ...prev, [key]: DEFAULT_DUPLICATE_CHECK }));
+      setDuplicateCheck((prev) => ({
+        ...prev,
+        [key]: DEFAULT_DUPLICATE_CHECK,
+      }));
     }
     setForm((prev) => ({ ...prev, [key]: value }));
   };
@@ -122,11 +128,25 @@ export function SignupPage() {
     }
   };
 
-  const handleSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
-    // 폼 제출 시 페이지 새로고침 방지
+  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!canSubmit || isSubmitting) return;
 
-    // 3.4에서 회원가입 API 요청 추가
+    setIsSubmitting(true);
+    try {
+      const response = await signup({
+        email: form.email.trim(),
+        nickname: form.nickname.trim(),
+        password: form.password,
+      });
+      alert(response.message);
+      // 로그인 페이지 연결 후 주석 해제
+      // navigate({ to: "/login" });
+    } catch {
+      alert("회원가입에 실패했어요. 다시 시도해 주세요.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // noValidate는 폼 제출 시 브라우저의 기본 유효성 검사를 끔
@@ -177,7 +197,9 @@ export function SignupPage() {
           <label htmlFor="signup-nickname" className={labelClass}>
             닉네임
           </label>
-          <div className={`${fieldBase} gap-[9px] ${borderOf(showNicknameError)}`}>
+          <div
+            className={`${fieldBase} gap-[9px] ${borderOf(showNicknameError)}`}
+          >
             <input
               id="signup-nickname"
               type="text"
@@ -197,7 +219,9 @@ export function SignupPage() {
             </button>
           </div>
           {showNicknameError && (
-            <p className={errorClass}>닉네임은 2자 이상 12자 이하로 입력해 주세요.</p>
+            <p className={errorClass}>
+              닉네임은 2자 이상 12자 이하로 입력해 주세요.
+            </p>
           )}
         </div>
 
@@ -252,11 +276,11 @@ export function SignupPage() {
         {/* button.btn: 높이 48px, #2563EB, radius 8px, 14px / 800 */}
         <button
           type="submit"
-          disabled={!canSubmit}
+          disabled={!canSubmit || isSubmitting}
           style={{ color: "#ffffff" }}
           className="flex h-12 w-full items-center justify-center rounded-lg border border-white bg-[#2563EB] px-4 text-[14px] leading-[17px] font-extrabold transition-opacity hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[#2563EB]"
         >
-          가입하기
+          {isSubmitting ? "가입 중" : "가입하기"}
         </button>
 
         {/* div.auth-footer: 13px / #606774, 링크 12px / 800 */}
