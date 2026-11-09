@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { ProfilePage } from "../pages/me/profile-page";
 
 export const Route = createFileRoute("/me")({
-  component: () => <main>내 정보</main>,
+  component: ProfilePage,
 });
