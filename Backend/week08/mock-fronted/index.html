@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>간이 프론트 - 중복 체크 & 별점 조회</title>
+    <style>
+      :root {
+        --bg: #f6f7f9;
+        --card: #fff;
+        --text: #1c2230;
+        --muted: #667085;
+        --line: #d9dee7;
+        --accent: #2b5fd9;
+        --ok: #14804a;
+        --err: #c0352b;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #14171d;
+          --card: #1d222b;
+          --text: #e8ebf0;
+          --muted: #9aa3b2;
+          --line: #323a47;
+          --accent: #6c93f5;
+          --ok: #4cc38a;
+          --err: #f2766b;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 24px 16px 48px;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          15px/1.5 system-ui,
+          "Apple SD Gothic Neo",
+          "Malgun Gothic",
+          sans-serif;
+      }
+      main {
+        max-width: 640px;
+        margin: 0 auto;
+        display: grid;
+        gap: 16px;
+      }
+      h1 {
+        font-size: 22px;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 16px;
+        margin: 0 0 10px;
+      }
+      section {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 16px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+      }
+      input {
+        flex: 1;
+        min-width: 0;
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+      }
+      input:focus-visible,
+      button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }
+      button {
+        padding: 8px 14px;
+        border: 0;
+        border-radius: 6px;
+        background: var(--accent);
+        color: #fff;
+        font: inherit;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .base {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .result {
+        margin-top: 12px;
+        font-size: 14px;
+      }
+      .msg-ok {
+        color: var(--ok);
+      }
+      .msg-err {
+        color: var(--err);
+      }
+      pre {
+        margin: 8px 0 0;
+        padding: 10px;
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        overflow-x: auto;
+        font-size: 13px;
+      }
+      .table-wrap {
+        overflow-x: auto;
+        margin-top: 8px;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 14px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 6px 10px;
+        border-bottom: 1px solid var(--line);
+      }
+      th {
+        color: var(--muted);
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div>
+        <h1>간이 프론트: 회원 정보 조회</h1>
+        <div class="base">
+          <label for="base">서버 주소</label>
+          <input id="base" value="http://localhost:8080" />
+        </div>
+      </div>
+
+      <section>
+        <h2>닉네임 중복 체크</h2>
+        <div class="row">
+          <input id="nickname" placeholder="닉네임 입력 (예: noco)" />
+          <button data-action="nickname">확인</button>
+        </div>
+        <div class="result" id="out-nickname"></div>
+      </section>
+
+      <section>
+        <h2>이메일 중복 체크</h2>
+        <div class="row">
+          <input
+            id="email"
+            type="email"
+            placeholder="이메일 입력 (예: a@b.com)"
+          />
+          <button data-action="email">확인</button>
+        </div>
+        <div class="result" id="out-email"></div>
+      </section>
+
+      <section>
+        <h2>회원 별점 조회</h2>
+        <div class="row">
+          <input
+            id="memberId"
+            type="number"
+            min="1"
+            placeholder="회원 ID (예: 1)"
+          />
+          <button data-action="ratings">조회</button>
+        </div>
+        <div class="result" id="out-ratings"></div>
+      </section>
+    </main>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+
+      // 서버에 GET 요청을 보내고 JSON을 돌려줌. 실패하면 에러를 던짐
+      async function call(path) {
+        const BASE = $("base").value.replace(/\/$/, "");
+        const res = await fetch(BASE + path); // 요청 보내기
+        const text = await res.text();
+        let data = text;
+        try {
+          data = JSON.parse(text);
+        } catch (_) {} // JSON이면 객체로 변환
+        if (!res.ok) {
+          const err = new Error("HTTP " + res.status);
+          err.body = data;
+          throw err; // 404, 500 등
+        }
+        return data;
+      }
+
+      function esc(v) {
+        return String(v ?? "").replace(
+          /[&<>"]/g,
+          (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
+        );
+      }
+      function pre(data) {
+        return `<pre>${esc(typeof data === "string" ? data : JSON.stringify(data, null, 2))}</pre>`;
+      }
+
+      // 에러를 화면에 표시
+      function showError(box, error) {
+        if (error.body !== undefined) {
+          box.innerHTML =
+            `<span class="msg-err">오류 (${esc(error.message)})</span>` +
+            pre(error.body);
+        } else {
+          box.innerHTML = `<span class="msg-err">연결 실패: 서버 주소/포트와 CORS 설정을 확인하세요.</span>`;
+        }
+      }
+
+      // 닉네임/이메일 중복 체크: kind는 "nickname" 또는 "email"
+      async function check(kind) {
+        const box = $("out-" + kind);
+        const value = $(kind).value.trim();
+        if (!value) {
+          box.innerHTML = `<span class="msg-err">값을 입력하세요.</span>`;
+          return;
+        }
+        box.innerHTML = "요청 중...";
+        try {
+          const data = await call(
+            `/members/${kind}/${encodeURIComponent(value)}`,
+          );
+          box.innerHTML = pre(data);
+        } catch (error) {
+          showError(box, error);
+        }
+      }
+
+      // 회원 별점 조회
+      async function ratings() {
+        const box = $("out-ratings");
+        const memberId = $("memberId").value.trim();
+        if (!memberId) {
+          box.innerHTML = `<span class="msg-err">회원 ID를 입력하세요.</span>`;
+          return;
+        }
+        box.innerHTML = "요청 중...";
+        try {
+          const list = await call(
+            `/members/${encodeURIComponent(memberId)}/ratings`,
+          );
+          if (Array.isArray(list) && list.length === 0) {
+            box.innerHTML = `<span class="msg-ok">등록된 별점이 없습니다.</span>`;
+          } else if (Array.isArray(list) && typeof list[0] === "object") {
+            const cols = [
+              ...new Set(list.flatMap((item) => Object.keys(item))),
+            ];
+            box.innerHTML =
+              `<span class="msg-ok">${list.length}건</span><div class="table-wrap"><table><thead><tr>` +
+              cols.map((c) => `<th>${esc(c)}</th>`).join("") +
+              `</tr></thead><tbody>` +
+              list
+                .map(
+                  (item) =>
+                    `<tr>${cols.map((c) => `<td>${esc(item[c])}</td>`).join("")}</tr>`,
+                )
+                .join("") +
+              `</tbody></table></div>`;
+          } else {
+            box.innerHTML = pre(list);
+          }
+        } catch (error) {
+          showError(box, error);
+        }
+      }
+
+      document.addEventListener("click", (e) => {
+        const a = e.target.dataset.action;
+        if (a === "nickname" || a === "email") check(a);
+        if (a === "ratings") ratings();
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter") return;
+        const map = {
+          nickname: "nickname",
+          email: "email",
+          memberId: "ratings",
+        };
+        const a = map[e.target.id];
+        if (a === "ratings") ratings();
+        else if (a) check(a);
+      });
+    </script>
+  </body>
+</html>
