@@ -1,16 +1,37 @@
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { useQueries } from "@tanstack/react-query";
+import { getMovieDetail } from "@/api/movies/get-movie-detail";
+import { useFavoritesQuery } from "@/hooks/use-favorites-query";
 import { useMeQuery } from "@/hooks/use-me-query";
+import { getTmdbPosterUrl } from "@/utils/movies/tmdb-image";
 
-const FAVORITE_MOVIES = [
-  { id: 1, title: "스파이더맨: 브랜드 뉴 데이", date: "2026.07.29", posterUrl: "" },
-  { id: 2, title: "오디세이", date: "2026.08.05", posterUrl: "" },
-  { id: 3, title: "미니언즈 & 몬스터즈", date: "2026.07.15", posterUrl: "" },
-];
 const sectionTitleClass = "text-[17px] leading-5 font-bold text-[#17191E]";
+const PAGE_SIZE = 10;
 
 export function ProfilePage() {
   const meQuery = useMeQuery();
   const profile = meQuery.data;
+
+  const favoritesQuery = useFavoritesQuery();
+  const favorites = favoritesQuery.data ?? [];
+
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(favorites.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageItems = favorites.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
+
+  // 서버는 movieId만 주기 때문에 제목/포스터는 TMDB 상세로 채워요.
+  // 상세 페이지와 같은 queryKey라 캐시를 같이 써요.
+  const movieQueries = useQueries({
+    queries: pageItems.map((item) => ({
+      queryKey: ["movies", "detail", item.movieId],
+      queryFn: () => getMovieDetail(item.movieId),
+    })),
+  });
 
   return (
     <main className="min-h-[calc(100vh-91px)] w-full bg-[#F6F7F9] font-['Pretendard']">
@@ -72,37 +93,72 @@ export function ProfilePage() {
           </div>
         </section>
 
-        {/* 내 즐겨찾기 (임시 데이터: 즐겨찾기 API 연동 전까지 유지) */}
+        {/* 내 즐겨찾기 */}
         <section className="flex flex-col gap-4">
           <h2 className={sectionTitleClass}>내 즐겨찾기</h2>
 
+          {favoritesQuery.isError && (
+            <p className="text-[12px] leading-[14px] text-[#DC2626]">
+              즐겨찾기를 불러오지 못했어요.
+            </p>
+          )}
+
+          {favoritesQuery.isLoading && (
+            <p className="text-sm text-[#606774]">불러오는 중...</p>
+          )}
+
+          {favoritesQuery.isSuccess && favorites.length === 0 && (
+            <p className="text-sm text-[#606774]">
+              아직 즐겨찾기한 영화가 없어요.
+            </p>
+          )}
+
           <div className="grid grid-cols-5 gap-x-[18px] gap-y-4">
-            {FAVORITE_MOVIES.map((movie) => (
-              <article key={movie.id} className="flex flex-col gap-1">
-                <div className="h-[274px] w-full overflow-hidden rounded-[10px] bg-[#E3E6EB]">
-                  {movie.posterUrl && (
-                    <img
-                      src={movie.posterUrl}
-                      alt={`${movie.title} 포스터`}
-                      className="size-full object-cover"
-                    />
-                  )}
-                </div>
-                <div className="pt-[5px] text-[14px] leading-[17px] font-extrabold text-[#17191E]">
-                  {movie.title}
-                </div>
-                <div className="text-[12px] leading-[14px] text-[#969DA8]">
-                  {movie.date}
-                </div>
-              </article>
-            ))}
+            {pageItems.map((item, index) => {
+              const movieQuery = movieQueries[index];
+              const movie = movieQuery?.data;
+              const posterUrl = movie ? getTmdbPosterUrl(movie.poster_path) : null;
+
+              return (
+                <Link
+                  key={item.favoriteId}
+                  to="/movies/$movieId"
+                  params={{ movieId: String(item.movieId) }}
+                  className="flex flex-col gap-1"
+                >
+                  <div className="h-[274px] w-full overflow-hidden rounded-[10px] bg-[#E3E6EB]">
+                    {posterUrl && (
+                      <img
+                        src={posterUrl}
+                        alt={`${movie?.title} 포스터`}
+                        className="size-full object-cover"
+                      />
+                    )}
+                  </div>
+                  <div className="pt-[5px] text-[14px] leading-[17px] font-extrabold text-[#17191E]">
+                    {movieQuery?.isError
+                      ? "영화 정보를 불러오지 못했어요."
+                      : (movie?.title ?? "불러오는 중...")}
+                  </div>
+                  <div className="text-[12px] leading-[14px] text-[#969DA8]">
+                    {movie?.release_date?.replaceAll("-", ".") ?? ""}
+                  </div>
+                </Link>
+              );
+            })}
           </div>
 
           <nav
             aria-label="즐겨찾기 페이지"
             className="mt-3 flex items-center justify-center gap-3"
           >
-            <button type="button" disabled aria-label="이전 페이지">
+            <button
+              type="button"
+              disabled={currentPage <= 1}
+              onClick={() => setPage(currentPage - 1)}
+              aria-label="이전 페이지"
+              className="disabled:opacity-40"
+            >
               <img
                 className="size-6"
                 src="/icons/chevron-left.svg"
@@ -116,9 +172,15 @@ export function ProfilePage() {
               style={{ color: "#ffffff" }}
               className="size-9 rounded-[7px] bg-[#17191E] text-[13px] leading-4 font-bold"
             >
-              1
+              {currentPage}
             </button>
-            <button type="button" disabled aria-label="다음 페이지">
+            <button
+              type="button"
+              disabled={currentPage >= totalPages}
+              onClick={() => setPage(currentPage + 1)}
+              aria-label="다음 페이지"
+              className="disabled:opacity-40"
+            >
               <img
                 className="size-6"
                 src="/icons/chevron-right.svg"

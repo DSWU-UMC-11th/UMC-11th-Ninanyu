@@ -1,9 +1,17 @@
 import { Link, useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { getMovieDetail } from "../../api/movies/get-movie-detail";
+import { getMemberRatings } from "../../api/ratings/ratings";
 import { TmdbFooter } from "../../components/layout/tmdb-footer";
-import { useBookmarkStore } from "../../stores/bookmark-store";
+import { useFavoriteStatusQuery } from "../../hooks/use-favorite-status-query"; // 실제 파일명에 맞게 조정
+import { useMemberId } from "../../hooks/use-member-id";
+import {
+  useDeleteRatingMutation,
+  useSaveRatingMutation,
+} from "../../hooks/use-rating-mutation";
+import { useToggleFavoriteMutation } from "../../hooks/use-toggle-favorite-mutation"; // 실제 파일명에 맞게 조정
+import { useAuthStore } from "../../stores/auth-store";
 import { cn } from "../../utils/cn";
 import { getMovieDetailErrorMessage } from "../../utils/movies/get-movie-detail-error-message";
 import {
@@ -80,10 +88,71 @@ export function MovieDetailPage() {
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState("");
 
-  const isBookmarked = useBookmarkStore((state) =>
-    state.bookmarkedMovieIds.includes(movieId),
-  );
-  const toggleBookmark = useBookmarkStore((state) => state.toggleBookmark);
+  // 훅은 모두 early return보다 위에서 호출해야 해요.
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const memberId = useMemberId();
+  const saveRatingMutation = useSaveRatingMutation();
+  const deleteRatingMutation = useDeleteRatingMutation();
+
+  // 즐겨찾기: 서버 상태를 기준으로 해요.
+  const favoriteStatusQuery = useFavoriteStatusQuery(movieId);
+  const toggleFavoriteMutation = useToggleFavoriteMutation();
+  const isBookmarked = favoriteStatusQuery.data?.isFavorite ?? false;
+
+  // 내 평점 목록에서 이 영화의 평점을 찾아요. 있으면 저장 시 수정으로 보내요.
+  const ratingsQuery = useQuery({
+    queryKey: ["ratings", memberId],
+    queryFn: () => getMemberRatings(memberId as number),
+    enabled: memberId !== null,
+  });
+  const myRating = ratingsQuery.data?.find((item) => item.movieId === movieId);
+
+  // 기존 평점이 있으면 입력값을 채워요.
+  useEffect(() => {
+    if (myRating) {
+      setRating(myRating.score);
+      setReview(myRating.comment ?? "");
+    }
+  }, [myRating?.ratingId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const isSaving = saveRatingMutation.isPending;
+  const isDeleting = deleteRatingMutation.isPending;
+
+  const handleToggleFavorite = () => {
+    if (!accessToken) {
+      alert("로그인이 필요해요.");
+      return;
+    }
+    toggleFavoriteMutation.mutate({ movieId, isFavorite: isBookmarked });
+  };
+
+  const handleSaveRating = () => {
+    if (rating === 0) return;
+
+    saveRatingMutation.mutate(
+      {
+        movieId,
+        ratingId: myRating?.ratingId,
+        body: { score: rating, comment: review },
+      },
+      {
+        onSuccess: () => alert("평점을 저장했어요."),
+      },
+    );
+  };
+
+  const handleDeleteRating = () => {
+    if (!myRating) return;
+    if (!window.confirm("평점을 삭제할까요?")) return;
+
+    deleteRatingMutation.mutate(myRating.ratingId, {
+      onSuccess: () => {
+        setRating(0);
+        setReview("");
+        alert("평점을 삭제했어요.");
+      },
+    });
+  };
 
   if (!isValidMovieId) {
     return <StatusMessage>올바르지 않은 영화 번호예요.</StatusMessage>;
@@ -167,8 +236,9 @@ export function MovieDetailPage() {
           <button
             type="button"
             aria-pressed={isBookmarked}
-            onClick={() => toggleBookmark(movie.id)}
-            className="inline-flex h-[42px] cursor-pointer items-center justify-center gap-2 rounded-lg border border-white bg-[#2563eb] px-4 text-sm font-extrabold text-white transition-colors hover:bg-[#1d4fd0]"
+            disabled={toggleFavoriteMutation.isPending}
+            onClick={handleToggleFavorite}
+            className="inline-flex h-[42px] cursor-pointer items-center justify-center gap-2 rounded-lg border border-white bg-[#2563eb] px-4 text-sm font-extrabold text-white transition-colors hover:bg-[#1d4fd0] disabled:cursor-not-allowed disabled:opacity-60"
           >
             <MaskIcon
               src={
@@ -226,11 +296,23 @@ export function MovieDetailPage() {
 
           <button
             type="button"
-            disabled={rating === 0}
+            disabled={rating === 0 || isSaving || isDeleting}
+            onClick={handleSaveRating}
             className="h-[42px] w-full cursor-pointer rounded-lg border border-white bg-[#17191e] px-4 text-sm font-extrabold text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-40"
           >
-            평점 저장
+            {isSaving ? "저장 중..." : myRating ? "평점 수정" : "평점 저장"}
           </button>
+
+          {myRating && (
+            <button
+              type="button"
+              disabled={isSaving || isDeleting}
+              onClick={handleDeleteRating}
+              className="h-[42px] w-full cursor-pointer rounded-lg border border-[#e3e6eb] bg-white px-4 text-sm font-extrabold text-[#17191e] hover:bg-[#f6f7f9] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {isDeleting ? "삭제 중..." : "평점 삭제"}
+            </button>
+          )}
         </aside>
       </div>
     </PageShell>
